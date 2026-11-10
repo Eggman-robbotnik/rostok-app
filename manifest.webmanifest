@@ -1,7 +1,7 @@
 {
   "name": "Росток — трекер привычек",
   "short_name": "Росток",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#1a1f2e",
   "theme_color": "#1a1f2e",
