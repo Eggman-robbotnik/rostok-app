@@ -1,13 +1,13 @@
 {
   "name": "Росток — трекер привычек",
   "short_name": "Росток",
-  "start_url": "./",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#1a1f2e",
   "theme_color": "#1a1f2e",
   "icons": [
     {
-      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Emoji_u1f331.svg/512px-Emoji_u1f331.svg.png",
+      "src": "https://dummyimage.com/512x512/1a1f2e/e8eaf0.png&text=Росток",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
