@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Росток — трекер привычек</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #1a1f2e; color: #e8eaf0; min-height: 100vh;
+    display: flex; justify-content: center; padding: 16px;
+  }
+  .app { width: 100%; max-width: 480px; }
+  .brand { text-align: center; font-size: 13px; color: #6a7290; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+  header { text-align: center; padding: 8px 0 16px; }
+  .plant-container { width: 160px; height: 192px; margin: 0 auto; transition: transform 0.1s; }
+  .plant-container:active { transform: scale(0.95); }
+  .plant-container svg { width: 100%; height: 100%; animation: sway 4s ease-in-out infinite; transform-origin: 50% 90%; }
+  @keyframes sway { 0%,100%{transform:rotate(-2deg)} 50%{transform:rotate(2deg)} }
+  
+  .streak { margin-top: 4px; font-size: 16px; color: #a0a8c0; }
+  .streak span { color: #f0b35c; font-weight: 600; }
+  .hint { font-size: 12px; color: #6a7290; margin-top: 4px; }
+  
+  .habits { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+  .habit {
+    display: flex; flex-direction: column; gap: 8px;
+    background: #252b3d; border-radius: 14px; padding: 14px;
+    transition: opacity 0.3s;
+  }
+  .habit.done { opacity: 0.6; }
+  .habit.done .name { text-decoration: line-through; color: #6a7290; }
+  
+  .habit-main { display: flex; align-items: center; gap: 12px; }
+  .check {
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 2px solid #4a5570; background: transparent;
+    color: white; font-size: 20px; font-weight: bold;
+    cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .habit.done .check { background: #6aab6a; border-color: #6aab6a; }
+  .info { flex: 1; min-width: 0; }
+  .name { font-size: 16px; word-break: break-word; font-weight: 500; }
+  .time { font-size: 13px; color: #a0a8c0; margin-top: 2px; }
+  .note { font-size: 12px; color: #8b94b0; margin-top: 4px; font-style: italic; }
+  
+  .actions { display: flex; gap: 4px; }
+  .icon-btn { background: none; border: none; color: #6a7290; font-size: 18px; cursor: pointer; padding: 4px; }
+  .icon-btn:hover { color: #e8eaf0; }
+  .delete:hover { color: #d05a5a; }
+
+  .history-bar { display: flex; gap: 4px; margin-top: 4px; }
+  .day-dot { width: 12px; height: 12px; border-radius: 50%; background: #323b52; }
+  .day-dot.active { background: #6aab6a; }
+
+  .empty { text-align: center; color: #6a7290; padding: 32px 16px; font-size: 15px; line-height: 1.5; }
+  
+  .add-section { display: flex; flex-direction: column; gap: 8px; background: #252b3d; border-radius: 14px; padding: 12px; }
+  .input-row { display: flex; gap: 8px; }
+  #habitName { flex: 1; background: #1a1f2e; border: none; color: #e8eaf0; font-size: 16px; padding: 12px; outline: none; border-radius: 8px; }
+  #habitName::placeholder, #habitNote::placeholder { color: #6a7290; }
+  #habitTime { background: #1a1f2e; border: none; color: #a0a8c0; font-size: 15px; padding: 12px 8px; outline: none; color-scheme: dark; width: 100px; border-radius: 8px; }
+  #habitNote { width: 100%; background: #1a1f2e; border: none; color: #a0a8c0; font-size: 14px; padding: 10px 12px; outline: none; border-radius: 8px; font-style: italic; }
+  
+  #addBtn { width: 100%; height: 48px; border-radius: 8px; background: #f0b35c; border: none; color: #1a1f2e; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+  #addBtn:active { transform: scale(0.98); }
+  #addBtn.cancel { background: #4a5570; color: #e8eaf0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="brand">🌱 Росток</div>
+  <header>
+    <div class="plant-container" id="plant" onclick="if(navigator.vibrate) navigator.vibrate(50)"></div>
+    <div class="streak">🔥 <span id="streak">0</span> <span id="streak-word">дней</span> подряд</div>
+    <div class="hint" id="hint"></div>
+  </header>
+  
+  <div class="habits" id="habits"></div>
+  
+  <div class="add-section">
+    <div class="input-row">
+      <input id="habitName" placeholder="Название (например, Выпить таблетку)" maxlength="40">
+      <input id="habitTime" type="time">
+    </div>
+    <input id="habitNote" placeholder="Заметка (например, 1 белая после еды)" maxlength="60">
+    <button id="addBtn">Добавить привычку</button>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'rostok_v4';
+const PLANT_STAGES = [
+  '<ellipse cx="50" cy="112" rx="36" ry="8" fill="#2a1f14"/><ellipse cx="50" cy="108" rx="6" ry="4" fill="#8b5a2b"/>',
+  '<ellipse cx="50" cy="112" rx="36" ry="8" fill="#2a1f14"/><line x1="50" y1="108" x2="50" y2="88" stroke="#4a7c59" stroke-width="3" stroke-linecap="round"/><ellipse cx="42" cy="93" rx="9" ry="4" fill="#6aab6a" transform="rotate(-25 42 93)"/><ellipse cx="58" cy="93" rx="9" ry="4" fill="#6aab6a" transform="rotate(25 58 93)"/>',
+  '<ellipse cx="50" cy="112" rx="36" ry="8" fill="#2a1f14"/><line x1="50" y1="108" x2="50" y2="72" stroke="#4a7c59" stroke-width="4" stroke-linecap="round"/><ellipse cx="38" cy="88" rx="11" ry="5" fill="#6aab6a" transform="rotate(-30 38 88)"/><ellipse cx="62" cy="88" rx="11" ry="5" fill="#6aab6a" transform="rotate(30 62 88)"/><ellipse cx="40" cy="76" rx="9" ry="4" fill="#7dbf7d" transform="rotate(-20 40 76)"/><ellipse cx="60" cy="76" rx="9" ry="4" fill="#7dbf7d" transform="rotate(20 60 76)"/>',
+  '<ellipse cx="50" cy="112" rx="36" ry="8" fill="#2a1f14"/><path d="M47 108 L48 70 L52 70 L53 108 Z" fill="#6b4226"/><path d="M50 85 L40 75 M50 80 L60 70" stroke="#6b4226" stroke-width="2" stroke-linecap="round"/><circle cx="50" cy="65" r="15" fill="#4a7c59"/><circle cx="40" cy="72" r="10" fill="#5c966d"/><circle cx="60" cy="72" r="10" fill="#5c966d"/>',
+  '<ellipse cx="50" cy="112" rx="36" ry="8" fill="#2a1f14"/><path d="M45 108 L47 60 L53 60 L55 108 Z" fill="#6b4226"/><path d="M50 80 L35 65 M50 75 L65 60" stroke="#6b4226" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="45" r="20" fill="#4a7c59"/><circle cx="35" cy="55" r="15" fill="#5c966d"/><circle cx="65" cy="55" r="15" fill="#5c966d"/><circle cx="50" cy="30" r="12" fill="#6aab6a"/><circle cx="42" cy="48" r="3" fill="#f0b35c"/><circle cx="58" cy="42" r="3" fill="#f0b35c"/>',
+  '<ellipse cx="50" cy="112" rx="36" ry="8" fill="#2a1f14"/><path d="M42 108 L46 50 L54 50 L58 108 Z" fill="#6b4226"/><path d="M50 75 L30 55 M50 65 L70 45" stroke="#6b4226" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="40" r="25" fill="#3d6e47"/><circle cx="30" cy="50" r="18" fill="#4a7c59"/><circle cx="70" cy="50" r="18" fill="#4a7c59"/><circle cx="40" cy="25" r="15" fill="#5c966d"/><circle cx="60" cy="25" r="15" fill="#5c966d"/><circle cx="35" cy="45" r="3" fill="#f0b35c"/><circle cx="60" cy="35" r="3" fill="#f0b35c"/><circle cx="55" cy="55" r="3" fill="#f0b35c"/><circle cx="45" cy="20" r="3" fill="#f0b35c"/><circle cx="65" cy="45" r="3" fill="#f0b35c"/><circle cx="30" cy="35" r="3" fill="#f0b35c"/>'
+];
+
+let state = { habits: [], totalCompletions: 0, streak: 0, lastCompletedDate: null, lastOpened: null };
+let editId = null;
+
+function todayStr() { return new Date().toISOString().slice(0,10); }
+function yesterdayStr() { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); }
+function escapeHTML(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function getStage(streak) { 
+    if (streak === 0) return 0; 
+    if (streak < 3) return 1;  
+    if (streak < 7) return 2;  
+    if (streak < 14) return 3; 
+    if (streak < 30) return 4;
+    return 5;                  
+}
+
+function getNextStageHint(streak) {
+    if (streak === 0) return "Выполните привычку, чтобы посадить росток!";
+    if (streak < 3) return `До след. уровня: ${3 - streak} дн.`;
+    if (streak < 7) return `До след. уровня: ${7 - streak} дн.`;
+    if (streak < 14) return `До след. уровня: ${14 - streak} дн.`;
+    if (streak < 30) return `До след. уровня: ${30 - streak} дн.`;
+    return "Максимальный уровень! Вы великолепны!";
+}
+
+function plantSVG(stage) { return `<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">${PLANT_STAGES[stage]}</svg>`; }
+
+function getDaysWord(n) {
+  if (n % 10 === 1 && n % 100 !== 11) return 'день';
+  if ([2,3,4].includes(n % 10) && ![12,13,14].includes(n % 100)) return 'дня';
+  return 'дней';
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = Object.assign(state, JSON.parse(raw));
+  } catch (e) { console.warn('Load failed', e); }
+  if (!Array.isArray(state.habits)) state.habits = [];
+  
+  state.habits.forEach(h => {
+      if (!h.history) h.history = h.doneToday ? [todayStr()] : [];
+      if (h.note === undefined) h.note = '';
+  });
+
+  const today = todayStr();
+  if (state.lastOpened !== today) {
+    state.habits.forEach(h => h.doneToday = false);
+    state.lastOpened = today;
+  }
+  
+  if (state.lastCompletedDate && state.lastCompletedDate !== today && state.lastCompletedDate !== yesterdayStr()) {
+    state.streak = 0;
+  }
+  save();
+}
+
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } 
+  catch (e) { console.warn('Save failed', e); }
+}
+
+function isDue(h) {
+  if (h.doneToday || !h.time) return false;
+  const now = new Date();
+  const [hh, mm] = h.time.split(':').map(Number);
+  const t = new Date(); t.setHours(hh, mm, 0, 0);
+  return now >= t;
+}
+
+function openGoogleCalendar(habit) {
+    const title = encodeURIComponent(habit.name);
+    const details = encodeURIComponent(habit.note || 'Напоминание от Ростка');
+    let start = new Date();
+    if (habit.time) {
+        let [h, m] = habit.time.split(':');
+        start.setHours(h, m, 0, 0);
+    } else {
+        start.setHours(9, 0, 0, 0); 
+    }
+    let end = new Date(start.getTime() + 30 * 60000);
+    const formatG = (d) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const dates = `${formatG(start)}/${formatG(end)}`;
+    const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}&recur=RRULE:FREQ=DAILY`;
+    window.open(url, '_blank');
+}
+
+function render() {
+  document.getElementById('plant').innerHTML = plantSVG(getStage(state.streak));
+  document.getElementById('streak').textContent = state.streak;
+  document.getElementById('streak-word').textContent = getDaysWord(state.streak);
+  document.getElementById('hint').textContent = getNextStageHint(state.streak);
+  
+  const container = document.getElementById('habits');
+  if (state.habits.length === 0) {
+    container.innerHTML = '<div class="empty">Пока пусто.<br>Добавьте первую привычку — и посадите росток 🌱</div>';
+    return;
+  }
+  
+  const sorted = [...state.habits].sort((a,b) => {
+    if (!a.time && !b.time) return 0;
+    if (!a.time) return 1;
+    if (!b.time) return -1;
+    return a.time.localeCompare(b.time);
+  });
+
+  let days = [];
+  for (let i = 6; i >= 0; i--) {
+      let d = new Date(); d.setDate(d.getDate() - i);
+      days.push(d.toISOString().slice(0,10));
+  }
+
+  container.innerHTML = sorted.map(h => {
+    let historyDots = days.map(date => `<div class="day-dot ${h.history.includes(date) ? 'active' : ''}"></div>`).join('');
+    return `
+    <div class="habit ${h.doneToday ? 'done' : ''}" data-id="${h.id}">
+      <div class="habit-main">
+          <button class="check" data-action="toggle">${h.doneToday ? '✓' : ''}</button>
+          <div class="info">
+            <div class="name">${escapeHTML(h.name)}</div>
+            ${h.time ? `<div class="time">🕒 ${h.time}${isDue(h) ? '<span class="due-dot"></span>' : ''}</div>` : ''}
+            ${h.note ? `<div class="note">📝 ${escapeHTML(h.note)}</div>` : ''}
+            <div class="history-bar">${historyDots}</div>
+          </div>
+          <div class="actions">
+            <button class="icon-btn" data-action="calendar" title="В календарь">📅</button>
+            <button class="icon-btn" data-action="edit" title="Редактировать">✏️</button>
+            <button class="icon-btn delete" data-action="delete" title="Удалить">×</button>
+          </div>
+      </div>
+    </div>
+  `}).join('');
+}
+
+function updateFormState() {
+    const btn = document.getElementById('addBtn');
+    if (editId) {
+        btn.textContent = 'Сохранить изменения';
+        btn.classList.add('cancel');
+    } else {
+        btn.textContent = 'Добавить привычку';
+        btn.classList.remove('cancel');
+    }
+}
+
+document.getElementById('habits').addEventListener('click', e => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const id = btn.closest('.habit').dataset.id;
+  const action = btn.dataset.action;
+
+  if (action === 'toggle') {
+      if (navigator.vibrate) navigator.vibrate(50); 
+      const h = state.habits.find(x => x.id === id);
+      const today = todayStr();
+      if (h.doneToday) {
+          h.doneToday = false;
+          h.history = h.history.filter(d => d !== today);
+          const anyDone = state.habits.some(x => x.doneToday);
+          if (!anyDone) {
+              state.streak = Math.max(0, state.streak - 1);
+              state.lastCompletedDate = state.streak > 0 ? yesterdayStr() : null;
+          }
+      } else {
+          h.doneToday = true;
+          if (!h.history.includes(today)) h.history.push(today);
+          const anyDone = state.habits.some(x => x.doneToday);
+          if (anyDone && state.lastCompletedDate !== today) {
+              state.streak = (state.lastCompletedDate === yesterdayStr()) ? state.streak + 1 : 1;
+              state.lastCompletedDate = today;
+          }
+      }
+      save(); render();
+  } 
+  else if (action === 'delete') {
+      if (!confirm('Удалить привычку?')) return;
+      state.habits = state.habits.filter(h => h.id !== id);
+      save(); render();
+  }
+  else if (action === 'calendar') {
+      const h = state.habits.find(x => x.id === id);
+      openGoogleCalendar(h);
+  }
+  else if (action === 'edit') {
+      const h = state.habits.find(x => x.id === id);
+      editId = h.id;
+      document.getElementById('habitName').value = h.name;
+      document.getElementById('habitTime').value = h.time || '';
+      document.getElementById('habitNote').value = h.note || '';
+      updateFormState();
+      document.getElementById('habitName').focus();
+  }
+});
+
+document.getElementById('addBtn').addEventListener('click', () => {
+  const nameInput = document.getElementById('habitName');
+  const timeInput = document.getElementById('habitTime');
+  const noteInput = document.getElementById('habitNote');
+  const name = nameInput.value.trim();
+  const time = timeInput.value;
+  const note = noteInput.value.trim();
+  
+  if (!name) {
+    alert('Пожалуйста, введите название привычки!');
+    return;
+  }
+  
+  if (editId) {
+      const h = state.habits.find(x => x.id === editId);
+      h.name = name; h.time = time; h.note = note;
+      editId = null;
+  } else {
+      state.habits.push({ 
+          id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), 
+          name: name, time: time || null, note: note, doneToday: false, history: []
+      });
+  }
+  save(); render();
+  updateFormState();
+  nameInput.value = ''; timeInput.value = ''; noteInput.value = '';
+  nameInput.focus();
+});
+
+load(); render();
+setInterval(() => { 
+    if (document.visibilityState === 'visible') {
+        if (state.lastOpened !== todayStr()) load();
+        render();
+    } 
+}, 60000);
+
+// Подключение Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+</body>
+</html>
