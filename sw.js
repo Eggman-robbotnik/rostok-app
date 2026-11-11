@@ -1,12 +1,10 @@
-const CACHE_NAME = 'rostok-v1';
+const CACHE_NAME = 'rostok-v2';
 const ASSETS = [
   './',
   './index.html',
-  './manifest.json',
-  './icon.svg' // Если иконка локальная
+  './manifest.json'
 ];
 
-// Установка: кэшируем все файлы
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -15,7 +13,6 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Активация: удаляем старые кэши
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -26,7 +23,6 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Перехват запросов: сначала ищем в кэше, потом в сети
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
