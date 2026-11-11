@@ -1,0 +1,16 @@
+{
+  "name": "Росток — трекер привычек",
+  "short_name": "Росток",
+  "start_url": "https://falling-cherry-a9fb.mr-smirnov-dima98.workers.dev/",
+  "display": "standalone",
+  "background_color": "#1a1f2e",
+  "theme_color": "#1a1f2e",
+  "icons": [
+    {
+      "src": "https://dummyimage.com/512x512/1a1f2e/e8eaf0.png&text=Росток",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
